@@ -7,6 +7,8 @@
  */
 angular.module('WasmExplorerApp', ['ngMaterial']).controller('WasmExplorerAppCtrl', WasmExplorerAppCtrl);
 
+console.log('V2');
+
 function toAddress(n) {
   var s = n.toString(16);
   while (s.length < 6) {
@@ -39,8 +41,8 @@ function padLeft(s, n, c) {
 }
 
 var x86JumpInstructions = [
-  "jmp", "ja", "jae", "jb", "jbe", "jc", "je", "jg", "jge", "jl", "jle", "jna", "jnae", 
-  "jnb", "jnbe", "jnc", "jne", "jng", "jnge", "jnl", "jnle", "jno", "jnp", "jns", "jnz", 
+  "jmp", "ja", "jae", "jb", "jbe", "jc", "je", "jg", "jge", "jl", "jle", "jna", "jnae",
+  "jnb", "jnbe", "jnc", "jne", "jng", "jnge", "jnl", "jnle", "jno", "jnp", "jns", "jnz",
   "jo", "jp", "jpe", "jpo", "js", "jz"
 ];
 
@@ -67,7 +69,7 @@ function WasmExplorerAppCtrl($scope, $timeout, $mdSidenav) {
   this.llvmInstructionDescription = null;
   this.hideProgress();
 
-  
+
   this.createSourceEditor();
   this.createWastEditor();
   this.createAssemblyEditor();
@@ -84,25 +86,26 @@ function WasmExplorerAppCtrl($scope, $timeout, $mdSidenav) {
 
   this.writeWelcomeMessage();
   this.listenForResizeEvents();
-  
+
   this.loadOptionDefaults();
   this.loadOptions();
-  
+
   this.loadUrlParameters();
 
   this.optionChanged();
 
   this.requestServiceVersion();
- 
+
   this.examples = Object.getOwnPropertyNames(cppExamples);
-  this.selectedExample;
+  this.selectedExample // Doesn't work here Yet
+  // this.selectedExample = "testFunction";
 
   this.dialects = ["C89", "C99", "C++98", "C++11", "C++14", "C++1z"];
-  
+
 
   this.optimizationLevels = ["0", "1", "2", "3", "4", "s"];
 
-  
+
 
   this.sharingLink = "";
 
@@ -153,7 +156,7 @@ p.saveOptions = function () {
   });
 };
 
-p.loadOptionDefaults = function() {
+p.loadOptionDefaults = function () {
   // sessionStorage.clear();
 
   function set(name, value) {
@@ -179,7 +182,7 @@ p.loadOptionDefaults = function() {
   set("optimizationLevel", "s");
 };
 
-p.mobileVersion = function() {
+p.mobileVersion = function () {
   var kind = getMobileOperatingSystem();
   if (kind == "Android" || kind == "iOS") {
     var s = 2; // Scale
@@ -246,7 +249,7 @@ p.optionChanged = function (uiOnlyOption) {
   }
 };
 
-p.getSelectedDialectText = function() {
+p.getSelectedDialectText = function () {
   if (this.dialect !== undefined) {
     return this.dialect;
   } else {
@@ -254,7 +257,7 @@ p.getSelectedDialectText = function() {
   }
 };
 
-p.getSelectedOptimizationLevelText = function() {
+p.getSelectedOptimizationLevelText = function () {
   if (this.optimizationLevel !== undefined) {
     return this.optimizationLevel;
   } else {
@@ -267,7 +270,7 @@ p.changeExample = function changeExample() {
   this.tryCompile();
 };
 
-p.getSelectedExampleText = function() {
+p.getSelectedExampleText = function () {
   if (this.selectedExample !== undefined) {
     return this.selectedExample;
   } else {
@@ -291,7 +294,7 @@ p.toggleLLVM = function toggleLLVM() {
   this.tryCompile();
   var self = this
   setTimeout(function () {
-    self.resizeEditors();  
+    self.resizeEditors();
   }, 200);
 };
 p.toggleConsole = function toggleConsole() {
@@ -299,10 +302,66 @@ p.toggleConsole = function toggleConsole() {
   sessionStorage.setItem('showConsole', this.showConsole);
   var self = this
   setTimeout(function () {
-    self.resizeEditors();  
+    self.resizeEditors();
   }, 200);
 };
+console.log('V2!!');
+
+
+function lazyLoad(s, cb) {
+  var d = window.document;
+  var e = d.createElement("script");
+  e.async = true;
+  e.src = s;
+  d.body.appendChild(e);
+  e.onload = function () {
+    cb.call(this);
+  }
+}
+
+var isBinaryenInstantiated = false
+p.run_wasm = run_wasm = function run_wasm(params) {
+  var self = this
+  console.log('compile_wasm !!');
+  if (typeof Binaryen === "undefined") {
+    console.log("lazyLoad");
+    lazyLoad("lib/binaryen.js", go)
+  } else go()
+  function go() {
+    try {
+      console.log('GO!');
+      if (!isBinaryenInstantiated) {
+        Binaryen = Binaryen();
+        isBinaryenInstantiated = true;
+      }
+      var wast = wastEditor.getValue();
+      var module = new Binaryen.Module();
+      var parser = new Binaryen.SExpressionParser(input);
+      //  parsed input now somehow black-magically connected to module object !!!?!
+      var interface_ = new Binaryen.ShellExternalInterface();
+      instance = new Binaryen.ModuleInstance(module, interface_);
+      window.instance = window.wasm = wasm = instance
+      if (instance.main) {
+        window.log("calling wasm instance.main()\n");
+        console.log(instance.main());
+      }
+      window.log("no instance.main() entry point\n");
+      window.log("wasm object now globally available in window.instance ...\n");
+      self.appendConsole("YAY");
+    } catch (error) {
+      console.log("Error! Wasm los??");
+      console.log(error);
+      // throw new DOMException("Stack trace: + error")
+      if (error.split)
+        for (ex of error.split("\n"))
+          console.log(ex.replace("@http://0.0.0.0:8000", " @ "))
+      else throw error
+    }
+  }
+}
+
 p.execute = function execute() {
+  p.run_wasm()
   var self = this;
   var options = [];
   var source = this.wastEditor.getValue();
@@ -316,18 +375,20 @@ p.execute = function execute() {
 
   source = source.replace(/\"/g, "'");
 
-  // source.replace(/\"/g, "\\\"");
-  // source = "var wasm = wasmTextToBinary(\"" + source + "\");\n";
-  // source += "var exports = Wasm.instantiateModule(wasm, {}).exports;\n";
-  // source += "putstr(exports.main());\n";
-  
-  // var source = source.split("\n").map(function(s) {
-  //   return "\"" + s + "\\n\"";
-  // }).join("\n");
+  source.replace(/\"/g, "\\\"");
+  source = "var wasm = wasmTextToBinary(\"" + source + "\");\n";
+  source += "var exports = Wasm.instantiateModule(wasm, {}).exports;\n";
+  source += "putstr(exports.main());\n";
+
+  var source = source.split("\n").map(function (s) {
+    return "\"" + s + "\\n\"";
+  }).join("\n");
+
+
   this.wastEditor.setValue(source);
 };
 
-p.gatherOptions = function() {
+p.gatherOptions = function () {
   var options = [
     "-std=" + this.dialect.toLowerCase(),
     "-O" + this.optimizationLevel
@@ -357,12 +418,12 @@ p.compile = function compile() {
 
     // Parse and annotate errors if compilation fails.
     if (wast.indexOf("(module") !== 0) {
-      var re = /^.*?:(\d+?):(\d+?):(.*)$/gm; 
+      var re = /^.*?:(\d+?):(\d+?):(.*)$/gm;
       var m;
       var annotations = [];
       while ((m = re.exec(wast)) !== null) {
         if (m.index === re.lastIndex) {
-            re.lastIndex++;
+          re.lastIndex++;
         }
         var line = parseInt(m[1]) - 1;
         var column = parseInt(m[2]) - 1;
@@ -429,7 +490,7 @@ p.fileBug = function () {
     }
 
     window.open("https://bugzilla.mozilla.org/enter_bug.cgi?product=Core&component=JavaScript%20Engine%3A%20JIT&cc=sunfish@mozilla.com&short_desc=&comment=" + encodeURIComponent(comment));
-  });  
+  });
 };
 p.getShareUrl = function () {
   var self = this;
@@ -465,6 +526,11 @@ p.share = function share() {
 };
 p.assemble = function assemble() {
   var self = this;
+  window.log = function (message) {
+    console.log(message);
+    self.consoleEditor.insert(message);
+  };
+  this.run_wasm()
   var wast = self.wastEditor.getValue();
   if (wast.indexOf("module") < 0) {
     self.appendConsole("Doesn't look like a wasm module.");
@@ -482,8 +548,8 @@ p.assemble = function assemble() {
     var actionString = "wast2assembly";
     var options = self.wasmBaseline ? "--wasm-always-baseline" : "";
     var optionsString = encodeURIComponent(options).replace('%20', '+');
-    self.sendRequest("input=" + inputString + "&action=" + actionString +
-                     "&options=" + optionsString, function () {
+    var params = "input=" + inputString + "&action=" + actionString + "&options=" + optionsString
+    self.sendRequest(params, function () {
       var json = JSON.parse(this.responseText);
       if (typeof json === "string") {
         var parseError = "wasm text error: parsing wasm text at ";
@@ -492,7 +558,8 @@ p.assemble = function assemble() {
           var line = Number(location[0]) - 1;
           var column = Number(location[1]) - 1;
           var Range = ace.require('ace/range').Range;
-          var mark = self.wastEditor.getSession().addMarker(new Range(line, column, line, column + 1), "marked", "text", false);
+          var range = new Range(line, column, line, column + 1)
+          var mark = self.wastEditor.getSession().addMarker(range, "marked", "text", false);
           self.wastEditor.getSession().setAnnotations([{
             row: line,
             column: column,
@@ -515,7 +582,7 @@ p.assemble = function assemble() {
         var csBuffer = decodeRestrictedBase64ToBytes(region.bytes);
         var instructions = cs.disasm(csBuffer, region.entry);
         var basicBlocks = {};
-        instructions.forEach(function(instr, i) {
+        instructions.forEach(function (instr, i) {
           self.assemblyInstructionsByAddress[instr.address] = instr;
           if (isBranch(instr)) {
             var targetAddress = parseInt(instr.op_str);
@@ -528,7 +595,7 @@ p.assemble = function assemble() {
             }
           }
         });
-        instructions.forEach(function(instr) {
+        instructions.forEach(function (instr) {
           if (basicBlocks[instr.address]) {
             s += " " + padRight(toAddress(instr.address) + ":", 39, " ");
             if (basicBlocks[instr.address].length > 0) {
@@ -552,13 +619,15 @@ p.assemble = function assemble() {
     }
   }
 }
-p.buildDownload = function() {
+p.buildDownload = function () {
+  self = this // Safe context!
   document.getElementById('downloadLink').href = '';
   var wast = this.wastEditor.getValue();
   if (!/^\s*\(module\b/.test(wast)) {
     return; // Sanity check
   }
-  this.sendRequest("input=" + encodeURIComponent(wast).replace('%20', '+') + "&action=wast2wasm", function () {
+  let request = "input=" + encodeURIComponent(wast).replace('%20', '+') + "&action=wast2wasm"
+  this.sendRequest(request, function () {
     var wasm = this.responseText;
     if (wasm.indexOf("WASM binary data") < 0) {
       console.log('Error during WASM compilation: ' + wasm);
@@ -567,7 +636,7 @@ p.buildDownload = function() {
     document.getElementById('downloadLink').href = "data:;base64," + wasm.split('\n')[1];
   }, "Compiling .wast to .wasm");
 }
-p.download = function() {
+p.download = function () {
   if (document.getElementById('downloadLink').href != document.location) {
     document.getElementById("downloadLink").click();
   }
@@ -583,7 +652,7 @@ p.hideProgress = function () {
 };
 p.sendRequest = function sendRequest(command, cb, message) {
   var self = this;
-  var xhr = new XMLHttpRequest();
+  var xhr = new XMLHttpRequest({ mozSystem: true });// {mozSystem: allow Cross-Origin Request
   xhr.addEventListener("load", function () {
     self.hideProgress();
     self._scope.$apply();
@@ -606,7 +675,7 @@ function setDefaultEditorSettings(editor, options) {
   editor.renderer.setScrollMargin(10, 10);
 }
 
-p.lazyLoad = function(s, cb) {
+p.lazyLoad = function (s, cb) {
   var self = this;
   self.showProgress("Loading: " + s);
   var d = window.document;
@@ -622,21 +691,21 @@ p.lazyLoad = function(s, cb) {
   }
 }
 
-p.createBanner = function() {
+p.createBanner = function () {
   function resize() {
     var pattern = Trianglify({
       height: 70,
       width: window.innerWidth,
       cell_size: 40 + Math.random() * 30
     });
-    pattern.canvas(document.getElementById('banner'));  
+    pattern.canvas(document.getElementById('banner'));
   }
   resize();
   window.addEventListener("resize", resizeThrottler, false);
   var resizeTimeout;
   function resizeThrottler() {
     if (!resizeTimeout) {
-      resizeTimeout = setTimeout(function() {
+      resizeTimeout = setTimeout(function () {
         resizeTimeout = null;
         actualResizeHandler();
       }, 66);
@@ -651,7 +720,7 @@ p.createBanner = function() {
   }
 };
 
-p.resizeEditors = function() {
+p.resizeEditors = function () {
   this.editors.forEach(function (editor) {
     editor.resize();
   });
@@ -661,13 +730,13 @@ p.resizeEditors = function() {
   // this.assemblyEditor.renderer.setShowGutter(show);
 };
 
-p.listenForResizeEvents = function() {
+p.listenForResizeEvents = function () {
   window.addEventListener("resize", resizeThrottler, false);
   var resizeTimeout;
   var self = this;
   function resizeThrottler() {
     if (!resizeTimeout) {
-      resizeTimeout = setTimeout(function() {
+      resizeTimeout = setTimeout(function () {
         resizeTimeout = null;
         actualResizeHandler();
       }, 66);
@@ -683,20 +752,22 @@ p.listenForResizeEvents = function() {
   self.resizeEditors();
 };
 
-p.createSourceEditor = function() {
+p.createSourceEditor = function () {
   var self = this;
   this.sourceEditor = ace.edit("sourceCodeContainer");
+  this.sourceEditor.$blockScrolling = Infinity
   this.sourceEditor.getSession().setMode("ace/mode/c_cpp");
   setDefaultEditorSettings(this.sourceEditor, {
-    wrap: true, 
+    wrap: true,
     enableBasicAutocompletion: true,
     enableSnippets: true,
     enableLiveAutocompletion: true
   });
+  this.sourceEditor.setValue("int main(){return 3;}")
   this.sourceEditor.commands.addCommand({
     name: 'compileCommand',
-    bindKey: {win: 'Ctrl-Enter',  mac: 'Command-Enter'},
-    exec: function(editor) {
+    bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+    exec: function (editor) {
       self.compile();
       self._scope.$apply();
     },
@@ -704,19 +775,20 @@ p.createSourceEditor = function() {
   });
 }
 
-p.createWastEditor = function() {
+p.createWastEditor = function () {
   var self = this;
-  this.wastEditor = ace.edit("wastCodeContainer");
+  wastEditor = this.wastEditor = ace.edit("wastCodeContainer");
+  this.wastEditor.$blockScrolling = Infinity
   setDefaultEditorSettings(this.wastEditor, {
-    wrap: true, 
+    wrap: true,
     enableBasicAutocompletion: true,
     enableSnippets: true,
     enableLiveAutocompletion: true
   });
   this.wastEditor.commands.addCommand({
     name: 'assembleCommand',
-    bindKey: {win: 'Ctrl-Enter',  mac: 'Command-Enter'},
-    exec: function(editor) {
+    bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+    exec: function (editor) {
       self.assemble();
       self._scope.$apply();
     },
@@ -724,58 +796,61 @@ p.createWastEditor = function() {
   });
 }
 
-p.createLLVMAssemblyEditor = function() {
+p.createLLVMAssemblyEditor = function () {
   this.llvmAssemblyEditor = ace.edit("llvmAssemblyCodeContainer");
+  this.llvmAssemblyEditor.$blockScrolling = Infinity
   this.llvmAssemblyEditor.getSession().setMode("ace/mode/assembly_x86");
   setDefaultEditorSettings(this.llvmAssemblyEditor);
   this.llvmAssemblyEditor.renderer.setOption('showLineNumbers', false);
   var self = this;
-  this.llvmAssemblyEditor.getSession().selection.on('changeCursor', function(e) {
+  this.llvmAssemblyEditor.getSession().selection.on('changeCursor', function (e) {
     self.annotateLLVMAssemblyEditor();
   });
 };
-p.annotateLLVMAssemblyEditor = function() {
+p.annotateLLVMAssemblyEditor = function () {
   var self = this;
   var editor = this.llvmAssemblyEditor;
   var line = editor.getSelectionRange().start.row;
   var text = editor.session.getLine(line);
-  
+
   // Descriptions
   this.llvmInstructionDescription = null;
   var mnemonic = match(/\s*(\w*)/, text, 1);
   var description = x86Reference[mnemonic.toUpperCase()];
   if (description) {
     this.llvmInstructionDescription = {
-      name: mnemonic.toLowerCase(), 
-      path: description.path, 
+      name: mnemonic.toLowerCase(),
+      path: description.path,
       description: description.description
     };
   }
   this._scope.$apply();
 };
-p.createAssemblyEditor = function() {
+p.createAssemblyEditor = function () {
   this.assemblyEditor = ace.edit("assemblyCodeContainer");
+  this.assemblyEditor.$blockScrolling = Infinity
   this.assemblyEditor.getSession().setMode("ace/mode/assembly_x86");
   setDefaultEditorSettings(this.assemblyEditor);
   this.assemblyEditor.renderer.setOption('showLineNumbers', false);
   var self = this;
-  this.assemblyEditor.getSession().selection.on('changeCursor', function(e) {
+  this.assemblyEditor.getSession().selection.on('changeCursor', function (e) {
     self.annotateAssemblyEditor();
   });
+  this.assemblyEditor.$blockScrolling = Infinity
 };
-p.clearAssemblyEditorMarkers = function() {
+p.clearAssemblyEditorMarkers = function () {
   var editor = this.assemblyEditor;
   this.assemblyEditorMarkers.forEach(function (marker) {
     editor.session.removeMarker(marker);
   });
   this.assemblyEditorMarkers.length = 0;
 };
-p.annotateAssemblyEditor = function() {
+p.annotateAssemblyEditor = function () {
   var self = this;
   var editor = this.assemblyEditor;
   var line = editor.getSelectionRange().start.row;
   var text = editor.session.getLine(line);
-  
+
 
   editor.session.clearAnnotations();
   this.clearAssemblyEditorMarkers();
@@ -786,8 +861,8 @@ p.annotateAssemblyEditor = function() {
   var description = x86Reference[mnemonic.toUpperCase()];
   if (description) {
     this.instructionDescription = {
-      name: mnemonic.toLowerCase(), 
-      path: description.path, 
+      name: mnemonic.toLowerCase(),
+      path: description.path,
       description: description.description
     };
   }
@@ -808,7 +883,7 @@ p.annotateAssemblyEditor = function() {
       wrap: true
     });
     var Range = ace.require('ace/range').Range;
-    search.findAll(editor.session).reduce(function(lines, range) {
+    search.findAll(editor.session).reduce(function (lines, range) {
       annotations.push({
         row: range.start.row,
         column: 0,
@@ -839,17 +914,18 @@ p.annotateAssemblyEditor = function() {
   self.assemblyEditor.getSession().setAnnotations(annotations);
 };
 
-p.createConsoleEditor = function() {
+p.createConsoleEditor = function () {
   this.consoleEditor = ace.edit("consoleContainer");
   // this.consoleEditor.getSession().setMode("ace/mode/assembly_x86");
   setDefaultEditorSettings(this.consoleEditor, {
     wrap: false
   });
+  this.consoleEditor.$blockScrolling = Infinity
 }
-p.appendConsole = function(s) {
+p.appendConsole = appendConsole = function (s) {
   this.consoleEditor.insert(s + "\n");
 };
-p.writeWelcomeMessage = function() {
+p.writeWelcomeMessage = function () {
   this.appendConsole(`Welcome to the WebAssembly Explorer
 ===================================
 
@@ -862,13 +938,20 @@ Built with Clang/LLVM, AngularJS, Ace Editor, Emscripten, SpiderMonkey, Binaryen
 };
 
 p.requestServiceVersion = function () {
-  var xhr = new XMLHttpRequest();
+  var baseUrl = WasmExplorerServiceBaseUrl + "version.php"
+  var xhr = new XMLHttpRequest({ mozSystem: true });
   var self = this;
   xhr.addEventListener("load", function () {
-    var info = JSON.parse(this.responseText);
-    self.appendConsole(`Service version ${info.version} (js: ${info.js}; clang: ${info.clang}; binaryen: ${info.binaryen})`);
+    try {
+      var info = JSON.parse(this.responseText);
+      self.appendConsole(`Service version ${info.version} (js: ${info.js}; clang: ${info.clang}; binaryen: ${info.binaryen})`);
+    } catch (error) {
+      console.log(baseUrl);
+      console.log(error);
+      console.log(this.responseText);
+    }
   });
-  xhr.open("GET", WasmExplorerServiceBaseUrl + "version.php", true);
+  xhr.open("GET", baseUrl, true);
   xhr.send();
 };
 
@@ -886,15 +969,15 @@ function shortenUrl(url, done) {
     googleJSClientLoaded.url = url;
     googleJSClientLoaded.done = done;
     // document.body.append('<script src="//apis.google.com/js/client.js?onload=googleJSClientLoaded">');
-    var script   = document.createElement("script");
-    script.type  = "text/javascript";
-    script.src   = "//apis.google.com/js/client.js?onload=googleJSClientLoaded";
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "//apis.google.com/js/client.js?onload=googleJSClientLoaded";
     document.body.appendChild(script);
     return;
   }
   var request = gapi.client.urlshortener.url.insert({
     resource: {
-        longUrl: url
+      longUrl: url
     }
   });
   request.then(function (resp) {
@@ -922,13 +1005,13 @@ function WasmExplorerQueryAppCtrl($scope) {
 };
 
 var p = WasmExplorerQueryAppCtrl.prototype;
-p.setTheme = function() {
+p.setTheme = function () {
   var theme = this.darkMode ? "ace/theme/monokai" : "ace/theme/github";
   this.wastEditor.setTheme(theme);
   this.consoleEditor.setTheme(theme);
   this.queryEditor.setTheme(theme);
 };
-p.createSourceEditor = function() {
+p.createSourceEditor = function () {
   var self = this;
   this.wastEditor = ace.edit("wastContainer");
   setDefaultEditorSettings(this.wastEditor, {
@@ -956,18 +1039,18 @@ p.createSourceEditor = function() {
   (f32.add $a (get_local $a))
 )`, -1);
 };
-p.getSelectedExampleText = function() {
+p.getSelectedExampleText = function () {
   if (this.selectedExample !== undefined) {
     return this.selectedExample;
   } else {
     return "Examples";
   }
 };
-p.createQueryEditor = function() {
+p.createQueryEditor = function () {
   var self = this;
   this.queryEditor = ace.edit("queryContainer");
   setDefaultEditorSettings(this.queryEditor, {
-    
+
   });
   this.queryEditor.setFontSize(12);
   this.queryEditor.$blockScrolling = Infinity;
@@ -1015,25 +1098,24 @@ p.createQueryEditor = function() {
 `, -1);
   this.queryEditor.commands.addCommand({
     name: 'runCommand',
-    bindKey: {win: 'Ctrl-Enter',  mac: 'Command-Enter'},
-    exec: function(editor) {
+    bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+    exec: function (editor) {
       self.run();
     },
     readOnly: true
   });
 }
-p.createConsoleEditor = function() {
-  this.consoleEditor = ace.edit("consoleContainer");
+p.createConsoleEditor = function () {
+  this.consoleEditor = consoleEditor = ace.edit("consoleContainer");
   setDefaultEditorSettings(this.consoleEditor, {
     wrap: false
-  }); 
+  });
   this.consoleEditor.setFontSize(12);
   this.consoleEditor.$blockScrolling = Infinity;
 }
-p.appendConsole = function(s) {
+p.appendConsole = function (s) {
   this.consoleEditor.insert(s + "\n");
-  this.consoleEditor.gotoLine(Infinity); 
-
+  this.consoleEditor.gotoLine(Infinity);
   // this.consoleEditor.selection.moveTo(Infinity, Infinity);
 };
 
@@ -1045,7 +1127,7 @@ function histogram(name, value) {
   if (!histograms[name].hasOwnProperty(value)) {
     histograms[name][value] = 0;
   }
-  histograms[name][value] ++;
+  histograms[name][value]++;
   return true;
 }
 
@@ -1069,7 +1151,7 @@ function printHistograms() {
     for (var key in histogram) {
       var percent = histogram[key] / sum;
       if (percent < ignoreThreshold) {
-        ignore ++;
+        ignore++;
         ignoreSum += histogram[key];
         continue;
       }
@@ -1088,7 +1170,7 @@ function printHistograms() {
       }
     });
     if (ignore) {
-      print(padLeft("< " + (ignoreThreshold * 100).toFixed(2) + "%", maxKeyLength, " ")  + " " + padRight(ignore, maxValueLength, " ") + " " + (ignoreSum / sum * 100).toFixed(2) + "%");
+      print(padLeft("< " + (ignoreThreshold * 100).toFixed(2) + "%", maxKeyLength, " ") + " " + padRight(ignore, maxValueLength, " ") + " " + (ignoreSum / sum * 100).toFixed(2) + "%");
     }
   });
 }
@@ -1106,41 +1188,41 @@ function findAncestor(node, value, index) {
 
 p.run = function () {
   var self = this;
-  window.print = function (message) {
+  window.log = function (message) {
     self.appendConsole(message);
   };
 
-  window.histogram = histogram; 
+  window.histogram = histogram;
   var queryText = this.queryEditor.getValue();
   var queryAst = parseSExpression(queryText);
-  
+
   if (this.selectedExample !== "Wast Source") {
     var ast = this.selectedExampleAST[this.selectedExample];
     if (ast) {
       go(ast)
     } else {
-      var xhr = new XMLHttpRequest();
+      var xhr = new XMLHttpRequest({ mozSystem: true });
       xhr.addEventListener("load", function () {
         var source = this.responseText;
         self.appendConsole("Parsing and Caching AST, please wait ...");
         setTimeout(function () {
-          ast = parseSExpression(source);  
+          ast = parseSExpression(source);
           self.selectedExampleAST[self.selectedExample] = ast;
           go(ast);
         }, 1);
       });
       xhr.open("GET", this.selectedExample, true);
       xhr.send();
-      self.appendConsole("Downloading " + this.selectedExample + ", this may take a while ...");  
+      self.appendConsole("Downloading " + this.selectedExample + ", this may take a while ...");
     }
-    
+
   } else {
     setTimeout(function () {
-      var ast = parseSExpression(self.wastEditor.getValue());  
+      var ast = parseSExpression(self.wastEditor.getValue());
       go(ast);
     }, 1);
   }
-  
+
   function dotify(text, length) {
     if (text.length > length) {
       return text.substring(0, length - 4) + " ...";
@@ -1150,7 +1232,7 @@ p.run = function () {
   function go(ast) {
     runQueries();
     function runQueries() {
-      var i = 0; 
+      var i = 0;
       var queries = Array.prototype.map.call(queryAst, x => x);
       function next() {
         var query = queries.shift();
@@ -1194,3 +1276,4 @@ p.run = function () {
     }
   }
 };
+console.log('V2!');

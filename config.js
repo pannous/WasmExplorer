@@ -4,7 +4,7 @@
 
 var WasmExplorerVersion = "v2.10";
 
-var WasmExplorerServiceBaseUrl = "//areweflashyet.com/tmp/wasm/";
+var WasmExplorerServiceBaseUrl = "//areweflashyet.com/tmp/wasm/"; // +  "version.php" service.php ...
 
 var CapstoneLibraryPath = "//npmcdn.com/wasdk-capstone-x86/lib/capstone-x86.min.js";
 

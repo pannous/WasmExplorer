@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+console.log('EX V2');
+
+
 var output;
 var cppEditor = null;
 var wastEditor = null;
@@ -77,6 +80,7 @@ function setDefaultEditorSettings(editor) {
 
 function createCppEditor() {
   cppEditor = ace.edit("cppCodeContainer");
+  cppEditor.$blockScrolling = Infinity
   cppEditor.getSession().setMode("ace/mode/c_cpp");
   setDefaultEditorSettings(cppEditor);
   cppEditor.commands.addCommand({
@@ -105,6 +109,7 @@ function createCppEditor() {
 
 function createWastEditor() {
   wastEditor = ace.edit("wastCodeContainer");
+  wastEditor.$blockScrolling = Infinity
   setDefaultEditorSettings(wastEditor);
   wastEditor.commands.addCommand({
     name: 'assembleCommand',
@@ -118,6 +123,7 @@ function createWastEditor() {
 
 function createX86Editor() {
   x86Editor = ace.edit("x86CodeContainer");
+  x86Editor.$blockScrolling = Infinity
   x86Editor.getSession().setMode("ace/mode/assembly_x86");
   setDefaultEditorSettings(x86Editor);
 }
@@ -168,13 +174,13 @@ function toggleSettings() {
   settingsAreOpen = !settingsAreOpen;
 }
 
+
 function beautify() {
   if (typeof Binaryen === "undefined") {
     lazyLoad("lib/binaryen.js", go)
   } else {
     go();
   }
-
   function go() {
     if (!isBinaryenInstantiated) {
       Binaryen = Binaryen();
@@ -186,12 +192,14 @@ function beautify() {
     var s_module = parser.get_root().getChild(0);
     var builder = new Binaryen.SExpressionWasmBuilder(module, s_module);
 
-    wast = captureOutput(function() {
+    wast = captureOutput(function () {
       Binaryen.WasmPrinter.prototype.printModule(module);
     });
     wastEditor.setValue(wast, 1);
     var interface_ = new Binaryen.ShellExternalInterface();
     var instance = new Binaryen.ModuleInstance(module, interface_);
+    window.instance = instance
+    console.log('GO!');
   }
 }
 
@@ -303,7 +311,30 @@ function buildDownload() {
   }, "Compiling Wast to Wasm");
 }
 
+compile_wasm2 = function compile_wasm() {
+  console.log('compile_wasm');
+  if (!isBinaryenInstantiated) {
+    Binaryen = Binaryen();
+    isBinaryenInstantiated = true;
+  }
+  var wast = wastEditor.getValue();
+  var module = new Binaryen.Module();
+  var parser = new Binaryen.SExpressionParser(wast);
+  var s_module = parser.get_root().getChild(0);
+  var builder = new Binaryen.SExpressionWasmBuilder(module, s_module);
+
+  wast = captureOutput(function () {
+    Binaryen.WasmPrinter.prototype.printModule(module);
+  });
+  wastEditor.setValue(wast, 1);
+  var interface_ = new Binaryen.ShellExternalInterface();
+  var instance = new Binaryen.ModuleInstance(module, interface_);
+  window.instance = instance
+  console.log('GO!');
+}
+
 function assemble() {
+  compile_wasm()
   var wast = wastEditor.getValue();
   if (wast.indexOf("module") < 0) {
     x86Editor.getSession().setValue("; Doesn't look like a wasm module.", 1);
@@ -317,7 +348,8 @@ function assemble() {
   }
   function go() {
     wastEditor.getSession().clearAnnotations();
-    sendRequest("input=" + encodeURIComponent(wast).replace('%20', '+') + "&action=wast2assembly", function () {
+    request = "input=" + encodeURIComponent(wast).replace('%20', '+') + "&action=wast2assembly"
+    sendRequest(request, function () {
       var json = JSON.parse(this.responseText);
       if (typeof json === "string") {
         var parseError = "wasm text error: parsing wasm text at ";
